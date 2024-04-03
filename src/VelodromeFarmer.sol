@@ -98,6 +98,7 @@ contract VelodromeFarmer {
 
     IRouter.Route[] memory routes = OPTIMIZER.getOptimalTokenToTokenRoute(address(VELO), address(token), amount);
     uint256 amountOutMin = OPTIMIZER.getOptimalAmountOutMin(routes, amount, POINTS, slippage);
+    // slither-disable-next-line incorrect-equality -- zero is a flag value
     if (amountOutMin == 0) revert NoRouteFound();
 
     uint256 balanceBefore = token.balanceOf(address(account));

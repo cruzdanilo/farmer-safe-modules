@@ -57,6 +57,7 @@ contract VelodromeFarmer {
 
     {
       uint256[2] memory approvals;
+      // slither-disable-next-line unused-return -- liquidity is unneeded
       (approvals[0], approvals[1],) =
         ROUTER.quoteAddLiquidity(tokens[0], tokens[1], stable, address(POOL_FACTORY), amounts[0], amounts[1]);
 

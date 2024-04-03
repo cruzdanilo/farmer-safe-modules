@@ -39,45 +39,40 @@ contract VelodromeFarmer {
     if (!account.isOwner(msg.sender)) revert NotOwner();
     if (!VOTER.isGauge(address(gauge))) revert NotGauge();
 
-    Pool memory p;
-    p.pool = IPool(VOTER.poolForGauge(address(gauge)));
-    p.stable = p.pool.stable();
-    (p.token0, p.token1) = p.pool.tokens();
+    IPool pool = IPool(VOTER.poolForGauge(address(gauge)));
+    bool stable = pool.stable();
+    address[2] memory tokens;
+    (tokens[0], tokens[1]) = pool.tokens();
 
+    uint256[2] memory amounts;
     {
       uint256 earned = gauge.earned(address(account));
-      if (earned == 0) return;
+      if (earned == 0) revert NoReward();
 
       account.txCall(address(gauge), abi.encodeCall(IGauge.getReward, address(account)));
 
-      p.amount0 = swapTo(account, IERC20(p.token0), earned - earned / 2, slippage);
-      p.amount1 = swapTo(account, IERC20(p.token1), earned / 2, slippage);
+      amounts[0] = swapTo(account, IERC20(tokens[0]), earned - earned / 2, slippage);
+      amounts[1] = swapTo(account, IERC20(tokens[1]), earned / 2, slippage);
     }
 
-    (p.amount0Min, p.amount1Min,) =
-      ROUTER.quoteAddLiquidity(p.token0, p.token1, p.stable, address(POOL_FACTORY), p.amount0, p.amount1);
-    account.txCall(p.token0, abi.encodeCall(IERC20.approve, (address(ROUTER), p.amount0Min)));
-    account.txCall(p.token1, abi.encodeCall(IERC20.approve, (address(ROUTER), p.amount1Min)));
+    {
+      uint256[2] memory approvals;
+      (approvals[0], approvals[1],) =
+        ROUTER.quoteAddLiquidity(tokens[0], tokens[1], stable, address(POOL_FACTORY), amounts[0], amounts[1]);
+
+      account.txCall(tokens[0], abi.encodeCall(IERC20.approve, (address(ROUTER), approvals[0])));
+      account.txCall(tokens[1], abi.encodeCall(IERC20.approve, (address(ROUTER), approvals[1])));
+    }
 
     account.txCall(
       address(ROUTER),
       abi.encodeCall(
         IRouter.addLiquidity,
-        (
-          p.token0,
-          p.token1,
-          p.stable,
-          p.amount0,
-          p.amount1,
-          p.amount0Min,
-          p.amount1Min,
-          address(account),
-          block.timestamp
-        )
+        (tokens[0], tokens[1], stable, amounts[0], amounts[1], 0, 0, address(account), block.timestamp)
       )
     );
     account.txCall(
-      address(gauge), abi.encodeWithSignature("deposit(uint256)", IERC20(address(p.pool)).balanceOf(address(account)))
+      address(gauge), abi.encodeWithSignature("deposit(uint256)", IERC20(address(pool)).balanceOf(address(account)))
     );
   }
 
@@ -116,18 +111,8 @@ interface IOptimizer {
     returns (uint256);
 }
 
-struct Pool {
-  IPool pool;
-  address token0;
-  address token1;
-  bool stable;
-  uint256 amount0;
-  uint256 amount1;
-  uint256 amount0Min;
-  uint256 amount1Min;
-}
-
 error NoRouteFound();
 error NotGauge();
 error NotOwner();
+error NoReward();
 error SlippageTooHigh();

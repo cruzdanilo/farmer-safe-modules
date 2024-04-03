@@ -10,7 +10,11 @@ import { IRouter } from "velodrome/contracts/interfaces/IRouter.sol";
 import { IVoter } from "velodrome/contracts/interfaces/IVoter.sol";
 import { IVotingEscrow } from "velodrome/contracts/interfaces/IVotingEscrow.sol";
 
+import { SafeLib, ISafe } from "./SafeLib.sol";
+
 contract VelodromeFarmer {
+  using SafeLib for ISafe;
+
   IERC20 public immutable VELO;
   IVoter public immutable VOTER;
   IRouter public immutable ROUTER;
@@ -32,8 +36,8 @@ contract VelodromeFarmer {
 
   function farmLP(ISafe account, IGauge gauge, uint256 slippage) external {
     if (slippage > MAX_SLIPPAGE) revert SlippageTooHigh();
-    if (!VOTER.isGauge(address(gauge))) revert NotGauge();
     if (!account.isOwner(msg.sender)) revert NotOwner();
+    if (!VOTER.isGauge(address(gauge))) revert NotGauge();
 
     Pool memory p;
     p.pool = IPool(VOTER.poolForGauge(address(gauge)));
@@ -44,14 +48,7 @@ contract VelodromeFarmer {
       uint256 earned = gauge.earned(address(account));
       if (earned == 0) return;
 
-      assert(
-        account.execTransactionFromModule({
-          to: address(gauge),
-          value: 0,
-          data: abi.encodeCall(IGauge.getReward, address(account)),
-          operation: Operation.Call
-        })
-      );
+      account.txCall(address(gauge), abi.encodeCall(IGauge.getReward, address(account)));
 
       p.amount0 = swapTo(account, IERC20(p.token0), earned - earned / 2, slippage);
       p.amount1 = swapTo(account, IERC20(p.token1), earned / 2, slippage);
@@ -59,37 +56,28 @@ contract VelodromeFarmer {
 
     (p.amount0Min, p.amount1Min,) =
       ROUTER.quoteAddLiquidity(p.token0, p.token1, p.stable, address(POOL_FACTORY), p.amount0, p.amount1);
-    approveRouter(account, p.token0, p.amount0Min);
-    approveRouter(account, p.token1, p.amount1Min);
+    account.txCall(p.token0, abi.encodeCall(IERC20.approve, (address(ROUTER), p.amount0Min)));
+    account.txCall(p.token1, abi.encodeCall(IERC20.approve, (address(ROUTER), p.amount1Min)));
 
-    assert(
-      account.execTransactionFromModule({
-        to: address(ROUTER),
-        value: 0,
-        data: abi.encodeCall(
-          IRouter.addLiquidity,
-          (
-            p.token0,
-            p.token1,
-            p.stable,
-            p.amount0,
-            p.amount1,
-            p.amount0Min,
-            p.amount1Min,
-            address(account),
-            block.timestamp
-          )
-          ),
-        operation: Operation.Call
-      })
+    account.txCall(
+      address(ROUTER),
+      abi.encodeCall(
+        IRouter.addLiquidity,
+        (
+          p.token0,
+          p.token1,
+          p.stable,
+          p.amount0,
+          p.amount1,
+          p.amount0Min,
+          p.amount1Min,
+          address(account),
+          block.timestamp
+        )
+      )
     );
-    assert(
-      account.execTransactionFromModule({
-        to: address(gauge),
-        value: 0,
-        data: abi.encodeWithSignature("deposit(uint256)", IERC20(address(p.pool)).balanceOf(address(account))),
-        operation: Operation.Call
-      })
+    account.txCall(
+      address(gauge), abi.encodeWithSignature("deposit(uint256)", IERC20(address(p.pool)).balanceOf(address(account)))
     );
   }
 
@@ -103,38 +91,16 @@ contract VelodromeFarmer {
 
     uint256 balanceBefore = token.balanceOf(address(account));
 
-    approveRouter(account, address(VELO), amount);
-    assert(
-      account.execTransactionFromModule({
-        to: address(ROUTER),
-        value: 0,
-        data: abi.encodeCall(
-          IRouter.swapExactTokensForTokens, (amount, amountOutMin, routes, address(account), block.timestamp)
-          ),
-        operation: Operation.Call
-      })
+    account.txCall(address(VELO), abi.encodeCall(IERC20.approve, (address(ROUTER), amount)));
+    account.txCall(
+      address(ROUTER),
+      abi.encodeCall(
+        IRouter.swapExactTokensForTokens, (amount, amountOutMin, routes, address(account), block.timestamp)
+      )
     );
 
     return token.balanceOf(address(account)) - balanceBefore;
   }
-
-  function approveRouter(ISafe account, address token, uint256 amount) internal {
-    assert(
-      account.execTransactionFromModule({
-        to: token,
-        value: 0,
-        data: abi.encodeCall(IERC20.approve, (address(ROUTER), amount)),
-        operation: Operation.Call
-      })
-    );
-  }
-}
-
-interface ISafe {
-  function isOwner(address owner) external view returns (bool);
-  function execTransactionFromModule(address to, uint256 value, bytes calldata data, Operation operation)
-    external
-    returns (bool success);
 }
 
 interface IOptimizer {
@@ -159,11 +125,6 @@ struct Pool {
   uint256 amount1;
   uint256 amount0Min;
   uint256 amount1Min;
-}
-
-enum Operation {
-  Call,
-  DelegateCall
 }
 
 error NoRouteFound();

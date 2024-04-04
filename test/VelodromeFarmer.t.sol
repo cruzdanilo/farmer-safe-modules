@@ -11,7 +11,8 @@ contract VelodromeFarmerTest is Test {
   VelodromeFarmer public farmer;
   ISafeAdmin public safe;
 
-  IERC20 public pool;
+  IERC20 public velo;
+  IPool public pool;
   IGauge public gauge;
   IVoter public voter;
   IRouter public router;
@@ -25,8 +26,10 @@ contract VelodromeFarmerTest is Test {
     router = IRouter(0xa062aE8A9c5e11aaA026fc2670B0D65cCc8B2858);
     optimizer = IOptimizer(0x2b0547920a21C0496742e92ddDC6483Db227a130);
     gauge = IGauge(0x76ec1eF8c0F72ccdFbB661664C6cB0Ac187D2fB5);
-    pool = IERC20(voter.poolForGauge(address(gauge)));
+    pool = IPool(voter.poolForGauge(address(gauge)));
+    velo = IERC20(optimizer.velo());
 
+    vm.label(address(velo), "VELO");
     vm.label(address(safe), "Safe");
     vm.label(address(pool), "Pool");
     vm.label(address(gauge), "Gauge");
@@ -35,7 +38,7 @@ contract VelodromeFarmerTest is Test {
     vm.label(address(optimizer), "Optimizer");
     vm.label(address(optimizer.factory()), "PoolFactory");
     vm.label(address(uint160(uint256(vm.load(address(safe), 0)))), "SafeSingleton");
-    (address token0, address token1) = IPool(voter.poolForGauge(address(gauge))).tokens();
+    (address token0, address token1) = pool.tokens();
     vm.label(token0, IERC20Metadata(token0).symbol());
     vm.label(token1, IERC20Metadata(token1).symbol());
 
@@ -50,7 +53,11 @@ contract VelodromeFarmerTest is Test {
   function testVelodromeFarmLP() external {
     farmer.farmLP(safe, gauge, 500);
 
-    assertEq(pool.balanceOf(address(safe)), 0);
+    (address token0, address token1) = pool.tokens();
+    assertEq(velo.balanceOf(address(safe)), 0);
+    assertEq(IERC20(address(pool)).balanceOf(address(safe)), 0);
+    assertEq(IERC20(token0).allowance(address(safe), address(router)), 0);
+    assertEq(IERC20(token1).allowance(address(safe), address(router)), 0);
   }
 }
 

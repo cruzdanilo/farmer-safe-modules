@@ -39,21 +39,22 @@ contract VelodromeFarmer {
     if (!account.isOwner(msg.sender)) revert NotOwner();
     if (!VOTER.isGauge(address(gauge))) revert NotGauge();
 
+    account.txCall(address(gauge), abi.encodeCall(IGauge.getReward, address(account)));
+
     IPool pool = IPool(VOTER.poolForGauge(address(gauge)));
-    bool stable = pool.stable();
     address[2] memory tokens;
     (tokens[0], tokens[1]) = pool.tokens();
 
-    uint256[2] memory amounts;
     {
-      uint256 earned = gauge.earned(address(account));
-      if (earned == 0) revert NoReward();
-
-      account.txCall(address(gauge), abi.encodeCall(IGauge.getReward, address(account)));
-
-      amounts[0] = swapTo(account, IERC20(tokens[0]), earned - earned / 2, slippage);
-      amounts[1] = swapTo(account, IERC20(tokens[1]), earned / 2, slippage);
+      uint256 balanceVELO = IERC20(VELO).balanceOf(address(account));
+      swapTo(account, IERC20(tokens[0]), balanceVELO - balanceVELO / 2, slippage);
+      swapTo(account, IERC20(tokens[1]), balanceVELO / 2, slippage);
     }
+
+    bool stable = pool.stable();
+    uint256[2] memory amounts;
+    amounts[0] = IERC20(tokens[0]).balanceOf(address(account));
+    amounts[1] = IERC20(tokens[1]).balanceOf(address(account));
 
     {
       uint256[2] memory approvals;
@@ -77,15 +78,13 @@ contract VelodromeFarmer {
     );
   }
 
-  function swapTo(ISafe account, IERC20 token, uint256 amount, uint256 slippage) internal returns (uint256 amountOut) {
-    if (address(token) == address(VELO)) return amount;
+  function swapTo(ISafe account, IERC20 token, uint256 amount, uint256 slippage) internal {
+    if (address(token) == address(VELO)) return;
 
     IRouter.Route[] memory routes = OPTIMIZER.getOptimalTokenToTokenRoute(address(VELO), address(token), amount);
     uint256 amountOutMin = OPTIMIZER.getOptimalAmountOutMin(routes, amount, POINTS, slippage);
     // slither-disable-next-line incorrect-equality -- zero is a flag value
     if (amountOutMin == 0) revert NoRouteFound();
-
-    uint256 balanceBefore = token.balanceOf(address(account));
 
     account.txCall(address(VELO), abi.encodeCall(IERC20.approve, (address(ROUTER), amount)));
     account.txCall(
@@ -94,8 +93,6 @@ contract VelodromeFarmer {
         IRouter.swapExactTokensForTokens, (amount, amountOutMin, routes, address(account), block.timestamp)
       )
     );
-
-    return token.balanceOf(address(account)) - balanceBefore;
   }
 }
 
@@ -115,5 +112,4 @@ interface IOptimizer {
 error NoRouteFound();
 error NotGauge();
 error NotOwner();
-error NoReward();
 error SlippageTooHigh();

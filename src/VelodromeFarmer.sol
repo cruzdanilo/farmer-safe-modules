@@ -37,11 +37,12 @@ contract VelodromeFarmer {
   function farmLP(ISafe account, IGauge gauge, uint256 slippage) external {
     if (slippage > MAX_SLIPPAGE) revert SlippageTooHigh();
     if (!account.isOwner(msg.sender)) revert NotOwner();
-    if (!VOTER.isGauge(address(gauge))) revert NotGauge();
+
+    IPool pool = IPool(VOTER.poolForGauge(address(gauge)));
+    if (address(pool) == address(0)) revert NotGauge();
 
     account.txCall(address(gauge), abi.encodeCall(IGauge.getReward, address(account)));
 
-    IPool pool = IPool(VOTER.poolForGauge(address(gauge)));
     address[2] memory tokens;
     (tokens[0], tokens[1]) = pool.tokens();
 

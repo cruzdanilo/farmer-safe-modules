@@ -5,7 +5,7 @@ import { Test } from "forge-std/Test.sol";
 
 import { IERC20Metadata } from "openzeppelin-contracts/contracts/token/ERC20/extensions/IERC20Metadata.sol";
 
-import { VelodromeFarmer, ISafe, IGauge, IOptimizer, IPool, IRouter, IVoter, IERC20 } from "../src/VelodromeFarmer.sol";
+import { IERC20, IGauge, IOptimizer, IPool, IRouter, ISafe, IVoter, VelodromeFarmer } from "../src/VelodromeFarmer.sol";
 
 contract VelodromeFarmerTest is Test {
   VelodromeFarmer public farmer;

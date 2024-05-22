@@ -5,12 +5,12 @@ import { IERC20 } from "openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 
 import { IGauge } from "velodrome/contracts/interfaces/IGauge.sol";
 import { IPool } from "velodrome/contracts/interfaces/IPool.sol";
-import { IPoolFactory } from "velodrome/contracts/interfaces/factories/IPoolFactory.sol";
 import { IRouter } from "velodrome/contracts/interfaces/IRouter.sol";
 import { IVoter } from "velodrome/contracts/interfaces/IVoter.sol";
 import { IVotingEscrow } from "velodrome/contracts/interfaces/IVotingEscrow.sol";
+import { IPoolFactory } from "velodrome/contracts/interfaces/factories/IPoolFactory.sol";
 
-import { SafeLib, ISafe } from "./SafeLib.sol";
+import { ISafe, SafeLib } from "./SafeLib.sol";
 
 contract VelodromeFarmer {
   using SafeLib for ISafe;

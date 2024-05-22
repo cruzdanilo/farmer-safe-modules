@@ -3,13 +3,15 @@
   "scripts": {
     "test": "concurrently 'npm:test:*' --group -c auto",
     "test:fmt": "forge fmt --check",
+    "test:sizes": "forge build --sizes --skip test",
     "test:forge": "forge snapshot --check",
     "test:solhint": "solhint '{src,script,test}/**/*.sol'",
     "test:slither": "slither .",
+    "snapshot": "forge snapshot --force",
     "prepare": "if git status &>/dev/null; then git submodule update --init --recursive; fi"
   },
   "devDependencies": {
     "concurrently": "^8.2.2",
-    "solhint": "^4.5.2"
+    "solhint": "^5.0.1"
   }
 }

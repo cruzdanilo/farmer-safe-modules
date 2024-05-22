@@ -3,12 +3,14 @@ pragma solidity ^0.8.0;
 
 import { IERC20 } from "openzeppelin-contracts/contracts/interfaces/IERC20.sol";
 
-import { IGauge } from "velodrome/contracts/interfaces/IGauge.sol";
-import { IPool } from "velodrome/contracts/interfaces/IPool.sol";
-import { IRouter } from "velodrome/contracts/interfaces/IRouter.sol";
-import { IVoter } from "velodrome/contracts/interfaces/IVoter.sol";
-import { IVotingEscrow } from "velodrome/contracts/interfaces/IVotingEscrow.sol";
-import { IPoolFactory } from "velodrome/contracts/interfaces/factories/IPoolFactory.sol";
+import { IGauge } from "@velodrome/contracts/interfaces/IGauge.sol";
+import { IPool } from "@velodrome/contracts/interfaces/IPool.sol";
+import { IRouter } from "@velodrome/contracts/interfaces/IRouter.sol";
+import { IVoter } from "@velodrome/contracts/interfaces/IVoter.sol";
+import { IVotingEscrow } from "@velodrome/contracts/interfaces/IVotingEscrow.sol";
+import { IPoolFactory } from "@velodrome/contracts/interfaces/factories/IPoolFactory.sol";
+
+import { IOptimizer } from "velodrome/src/interfaces/IOptimizer.sol";
 
 import { ISafe, SafeLib } from "./SafeLib.sol";
 
@@ -29,9 +31,9 @@ contract VelodromeFarmer {
     VOTER = voter;
     ROUTER = router;
     OPTIMIZER = optimizer;
-    POOL_FACTORY = optimizer.factory();
+    POOL_FACTORY = IPoolFactory(optimizer.factory());
 
-    assert(VELO == optimizer.velo());
+    assert(address(VELO) == optimizer.velo());
   }
 
   function farmLP(ISafe account, IGauge gauge, uint256 slippage) external {
@@ -47,7 +49,7 @@ contract VelodromeFarmer {
     (tokens[0], tokens[1]) = pool.tokens();
 
     {
-      uint256 balanceVELO = IERC20(VELO).balanceOf(address(account));
+      uint256 balanceVELO = VELO.balanceOf(address(account));
       swapTo(account, IERC20(tokens[0]), balanceVELO - balanceVELO / 2, slippage);
       swapTo(account, IERC20(tokens[1]), balanceVELO / 2, slippage);
     }
@@ -95,19 +97,6 @@ contract VelodromeFarmer {
       )
     );
   }
-}
-
-interface IOptimizer {
-  function velo() external view returns (IERC20);
-  function factory() external view returns (IPoolFactory);
-  function getOptimalTokenToTokenRoute(address token0, address token1, uint256 amountIn)
-    external
-    view
-    returns (IRouter.Route[] memory);
-  function getOptimalAmountOutMin(IRouter.Route[] calldata routes, uint256 amountIn, uint256 points, uint256 slippage)
-    external
-    view
-    returns (uint256);
 }
 
 error NoRouteFound();

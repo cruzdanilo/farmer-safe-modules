@@ -42,7 +42,7 @@ contract VelodromeFarmerTest is Test {
     vm.label(token0, IERC20Metadata(token0).symbol());
     vm.label(token1, IERC20Metadata(token1).symbol());
 
-    farmer = new VelodromeFarmer(voter, router, optimizer);
+    farmer = new VelodromeFarmer(voter, optimizer, address(router));
 
     vm.startPrank(address(safe));
     safe.enableModule(farmer);
@@ -51,7 +51,7 @@ contract VelodromeFarmerTest is Test {
   }
 
   function testVelodromeFarmLP() external {
-    farmer.farmLP(safe, gauge, 500);
+    farmer.farmLP(safe, address(gauge), 500);
 
     (address token0, address token1) = pool.tokens();
     assertEq(velo.balanceOf(address(safe)), 0);
